@@ -12,7 +12,7 @@ class MasterEncoder(nn.Module):
 
     def forward(self, sentence_tensor):
         out_tensor = sentence_tensor
-        out_tensor = self.input_layer(sentence_tensor)
+        out_tensor = self.input_layer(out_tensor)
         for i in range(len(self.basic_encoder_arr)):
             out_tensor = self.basic_encoder_arr[i](out_tensor)
         return out_tensor
