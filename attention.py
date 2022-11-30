@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+
 class SelfAttention(nn.Module):
     def __init__(self, xformer, num_atten_heads):
         super().__init__()
@@ -9,9 +10,9 @@ class SelfAttention(nn.Module):
         self.embedding_size = xformer.embedding_size # M
         self.num_atten_heads = num_atten_heads
         self.qkv_size = self.embedding_size // num_atten_heads
-        self.attention_heads_arr = nn.ModuleList([xformer.AttentionHead(self.max_seq_length, self.qkv_size, self.qkv_size, num_atten_heads) for _ in range(num_atten_heads)])
+        self.attention_heads_arr = nn.ModuleList([AttentionHead(self.max_seq_length, self.qkv_size, self.qkv_size, num_atten_heads) for _ in range(num_atten_heads)])
 
-    def forward(self, sentence_tensor): # Dimension sentence_tensor: (M x N_w)
+    def forward(self, sentence_tensor): # Dimension sentence_tensor: (N_w x M)
         concat_out_from_atten_heads = torch.zeros( sentence_tensor.shape[0], self.max_seq_length, self.num_atten_heads * self.qkv_size).float()
         # Cut Input According to Number of Attention Heads
         for i in range(self.num_atten_heads):
@@ -20,6 +21,7 @@ class SelfAttention(nn.Module):
             # Dimensions concat_out_from_atten_heads: (N_w x s_qkv)
             concat_out_from_atten_heads[:, :, i * self.qkv_size : (i+1) * self.qkv_size] = self.attention_heads_arr[i](sentence_embed_slice)
         return concat_out_from_atten_heads
+
 
 class AttentionHead(nn.Module):
     def __init__(self, max_seq_length, emb_size, qkv_size, num_atten_heads):
@@ -73,11 +75,11 @@ class CrossAttention(nn.Module):
         self.qkv_size = self.embedding_size // num_atten_heads
         self.attention_heads_arr = nn.ModuleList([xformer.CrossAttentionHead(self.max_seq_length, self.qkv_size, self.qkv_size, num_atten_heads) for _ in range(num_atten_heads)])
 
-    def forward(self, basic_decoder_out, final_encoder_out): # Dimension basic_decoder_out: (M x N_w), Dimension final_encoder_out: (M x N_w)
+    def forward(self, basic_decoder_out, final_encoder_out): # Dimension basic_decoder_out: (N_i x M), Dimension final_encoder_out: (N_w x M)
         concat_out_from_atten_heads = torch.zeros( basic_decoder_out.shape[0], self.max_seq_length, self.num_atten_heads * self.qkv_size).float()
         # Cut Input According to Number of Attention Heads
         for i in range(self.num_atten_heads):
-            # Dimensions basic_decoder_slice: (N_w x s_qkv)
+            # Dimensions basic_decoder_slice: (N_i x s_qkv)
             basic_decoder_slice = basic_decoder_out[:, :, i * self.qkv_size : (i+1) * self.qkv_size]
             # Dimensions final_encoder_slice: (N_w x s_qkv)
             final_encoder_slice = final_encoder_out[:, :, i * self.qkv_size : (i+1) * self.qkv_size]

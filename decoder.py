@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class MasterDecoderWithMasking(nn.Module):
     def __init__(self, xformer, num_basic_decoders, num_atten_heads):
         super().__init__()
@@ -8,17 +9,22 @@ class MasterDecoderWithMasking(nn.Module):
         self.embedding_size = xformer.embedding_size
         self.basic_decoder_arr = nn.ModuleList([BasicDecoderWithMasking(xformer, num_atten_heads) for _ in range(num_basic_decoders)])
 
-        def forward(self, sentence_tensor, final_encoder_out):
-            mask = torch.ones(1, dtype=int)
-            prediction = torch.ones(sentence_tensor.shape[0], self.max_seq_length, dtype=torch.long)
-            for mask_index in range(1, sentence_tensor.shape[1]):
-                masked_target_sentence = self.apply_mask(sentence_tensor, mask, self.max_seq_length, self.embedding_size)
-                out_tensor = masked_target_sentence
-                for i in range(len(self.basic_decoder_arr)):
-                    out_tensor = self.basic_decoder_arr[i](out_tensor, final_encoder_out, mask)
-                prediction[:, mask_index] = out_tensor[:,mask_index]
-                mask = torch.cat((mask, torch.ones(1, dtype=int)))
-            return prediction
+    def forward(self, sentence_tensor, final_encoder_out):
+        mask = torch.ones(1, dtype=int)
+        prediction = torch.ones(sentence_tensor.shape[0], self.max_seq_length, dtype=torch.long)
+        for mask_index in range(1, sentence_tensor.shape[1]):
+            masked_target_sentence = self.apply_mask(sentence_tensor, mask, self.max_seq_length, self.embedding_size)
+            out_tensor = masked_target_sentence
+            for i in range(len(self.basic_decoder_arr)):
+                out_tensor = self.basic_decoder_arr[i](out_tensor, final_encoder_out, mask)
+            prediction[:, mask_index] = out_tensor[:,mask_index]
+            mask = torch.cat((mask, torch.ones(1, dtype=int)))
+        return prediction
+
+    def apply_mask(self, sentence_tensor, mask, max_seq_length, embedding_size):
+        out = torch.zeros_like(sentence_tensor).float()
+        out[:, :len(mask), :] = sentence_tensor[:, :len(mask), :]
+        return out
 
 
 class BasicDecoderWithMasking(nn.Module):
