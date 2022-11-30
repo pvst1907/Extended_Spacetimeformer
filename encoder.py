@@ -6,10 +6,13 @@ class MasterEncoder(nn.Module):
     def __init__(self, xformer, num_basic_encoders, num_atten_heads):
         super().__init__()
         self.max_seq_length = xformer.max_seq_length  # N_w
+
+        self.input_layer = nn.Linear(in_features=xformer.input_size, out_features=xformer.embedding_size)
         self.basic_encoder_arr = nn.ModuleList([BasicEncoder(xformer, num_atten_heads) for _ in range(num_basic_encoders)])
 
     def forward(self, sentence_tensor):
         out_tensor = sentence_tensor
+        out_tensor = self.input_layer(sentence_tensor)
         for i in range(len(self.basic_encoder_arr)):
             out_tensor = self.basic_encoder_arr[i](out_tensor)
         return out_tensor
