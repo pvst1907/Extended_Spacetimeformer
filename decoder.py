@@ -1,5 +1,6 @@
 import torch.nn as nn
 from attention import SelfAttention, CrossAttention
+from pcoding import PositionalEncoder
 
 
 class MasterDecoderWithMasking(nn.Module):
@@ -7,14 +8,17 @@ class MasterDecoderWithMasking(nn.Module):
         super().__init__()
         self.max_seq_length = xformer.max_seq_length  # N_w
         self.embedding_size = xformer.embedding_size  # M
+        self.input_size = xformer.input_size
 
         self.input_layer = nn.Linear(in_features=xformer.input_size, out_features=xformer.embedding_size)
+        self.positional_encoding = PositionalEncoder(xformer.max_seq_length, xformer.embedding_size)
         self.basic_decoder_arr = nn.ModuleList([BasicDecoderWithMasking(xformer, num_atten_heads) for _ in range(num_basic_decoders)])
         self.output_layer = nn.Linear(in_features=xformer.embedding_size, out_features=xformer.output_size)
 
     def forward(self, sentence_tensor, final_encoder_out):
         out_tensor = sentence_tensor
         out_tensor = self.input_layer(out_tensor)
+        out_tensor = self.positional_encoding(out_tensor)
         for i in range(len(self.basic_decoder_arr)):
             out_tensor = self.basic_decoder_arr[i](out_tensor, final_encoder_out)
         return self.output_layer(out_tensor)

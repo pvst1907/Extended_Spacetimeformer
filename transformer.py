@@ -30,10 +30,22 @@ class Transformer(nn.Module):
         self.master_decoder = MasterDecoderWithMasking(self, num_basic_decoders, num_atten_heads)
 
     def forward(self, source, target):
-        # Missing: Positional Encoding
         source = self. master_encoder(source)
         output = self.master_decoder(target, source)
         return output
+
+    def predict(self, sequence, standardize=True):
+        if standardize:
+            scaler = preprocessing.MinMaxScaler().fit(sequence)
+            source = torch.from_numpy(scaler.transform(sequence)).float()
+        else:
+            source = torch.from_numpy(sequence).float()
+        target = torch.zeros_like(source)
+        target[0, :] = source[-1, :]
+        for i in range(1, self.pred_offset):
+            pred = self.forward(torch.unsqueeze(source, dim=0), torch.unsqueeze(target, dim=0))
+            target[i, :] = pred[0, i-1, :]
+        return torch.squeeze(pred).detach().numpy()
 
     def start_training(self,
                        sequence,

@@ -1,70 +1,34 @@
-from IPython import display
 import copy
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-
-from utils import set_axes
+from utils import Accumulator, Animator
 
 
-class Accumulator:
-    def __init__(self, n):
-        self.data = [0.0] * n
+class ScheduledOptim:
+    def __init__(self, optimizer, lr_mul, d_model, n_warmup_steps):
+        self._optimizer = optimizer
+        self.lr_mul = lr_mul
+        self.d_model = d_model
+        self.n_warmup_steps = n_warmup_steps
+        self.n_steps = 0
 
-    def add(self, *args):
-        self.data = [a + float(b) for a, b in zip(self.data, args)]
+    def step_and_update_lr(self):
+        self._update_learning_rate()
+        self._optimizer.step()
 
-    def reset(self):
-        self.data = [0.0] * len(self.data)
+    def zero_grad(self):
+        self._optimizer.zero_grad()
 
-    def __getitem__(self, idx):
-        return self.data[idx]
+    def _get_lr_scale(self):
+        d_model = self.d_model
+        n_steps, n_warmup_steps = self.n_steps, self.n_warmup_steps
+        return (d_model ** -0.5) * min(n_steps ** (-0.5), n_steps * n_warmup_steps ** (-1.5))
 
-
-class Animator:
-    def __init__(self,
-                 xlabel=None,
-                 ylabel=None,
-                 legend=None,
-                 xlim=None,
-                 ylim=None,
-                 xscale='linear',
-                 yscale='linear',
-                 fmts=('-', 'm--', 'g-.', 'r:'),
-                 nrows=1,
-                 ncols=1,
-                 figsize=(5, 3)):
-        if legend is None:
-            legend = []
-
-        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=figsize)
-
-        if nrows * ncols == 1:
-            self.axes = [self.axes, ]
-
-        self.config_axes = lambda: set_axes(self.axes[0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
-        self.X, self.Y, self.fmts = None, None, fmts
-
-    def add(self, x, y):
-        if not hasattr(y, "__len__"):
-            y = [y]
-        n = len(y)
-        if not hasattr(x, "__len__"):
-            x = [x] * n
-        if not self.X:
-            self.X = [[] for _ in range(n)]
-        if not self.Y:
-            self.Y = [[] for _ in range(n)]
-        for i, (a, b) in enumerate(zip(x, y)):
-            if a is not None and b is not None:
-                self.X[i].append(a)
-                self.Y[i].append(b)
-            self.axes[0].cla()
-            for x, y, fmt in zip(self.X, self.Y, self.fmts):
-                self.axes[0].plot(x, y, fmt)
-            self.config_axes()
-            display.display(self.fig)
-            display.clear_output(wait=True)
+    def _update_learning_rate(self):
+        self.n_steps += 1
+        lr = self.lr_mul * self._get_lr_scale()
+        for param_group in self._optimizer.param_groups:
+            param_group['lr'] = lr
 
 
 def train_epoch(xformer,
@@ -128,28 +92,4 @@ def evaluate_model(xformer, data_iter, metric):
     return tracker[0] / tracker[1]
 
 
-class ScheduledOptim:
-    def __init__(self, optimizer, lr_mul, d_model, n_warmup_steps):
-        self._optimizer = optimizer
-        self.lr_mul = lr_mul
-        self.d_model = d_model
-        self.n_warmup_steps = n_warmup_steps
-        self.n_steps = 0
 
-    def step_and_update_lr(self):
-        self._update_learning_rate()
-        self._optimizer.step()
-
-    def zero_grad(self):
-        self._optimizer.zero_grad()
-
-    def _get_lr_scale(self):
-        d_model = self.d_model
-        n_steps, n_warmup_steps = self.n_steps, self.n_warmup_steps
-        return (d_model ** -0.5) * min(n_steps ** (-0.5), n_steps * n_warmup_steps ** (-1.5))
-
-    def _update_learning_rate(self):
-        self.n_steps += 1
-        lr = self.lr_mul * self._get_lr_scale()
-        for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
