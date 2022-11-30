@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from utils import load_src_trg
 from encoder import MasterEncoder
 from decoder import MasterDecoderWithMasking
+from train import train_torch, ScheduledOptim
 from sklearn import preprocessing
 
 
@@ -22,6 +24,7 @@ class Transformer(nn.Module):
         self.output_size = output_size
         self.max_seq_length = max_seq_length
         self.embedding_size = embedding_size
+        self.scores = {}
 
         self.master_encoder = MasterEncoder(self, num_basic_encoders, num_atten_heads)
         self.master_decoder = MasterDecoderWithMasking(self, num_basic_decoders, num_atten_heads)
@@ -32,7 +35,17 @@ class Transformer(nn.Module):
         output = self.master_decoder(target, source)
         return output
 
-    def start_training(self, sequence, batch_size, num_warmup_steps, optimizer_params, standardize=True):
+    def start_training(self,
+                       sequence,
+                       loss,
+                       metric,
+                       epochs,
+                       batch_size,
+                       num_warmup_steps,
+                       optimizer_params,
+                       standardize=True,
+                       verbose=False,
+                       plot=False):
         if standardize:
             scaler = preprocessing.MinMaxScaler().fit(sequence)
             sequence_std = torch.from_numpy(scaler.transform(sequence)).float()
@@ -40,20 +53,19 @@ class Transformer(nn.Module):
             sequence_std = torch.from_numpy(sequence).float()
 
         # Generate Training Set
-        train_iter = load_src_trg(sequence_std, self.seq_len, self.pred_offset, batch_size)
+        train_iter = load_src_trg(sequence_std, self.max_seq_length, self.pred_offset, batch_size)
 
         beta1, beta2, epsilon = optimizer_params['beta1'], optimizer_params['beta2'], optimizer_params['epsilon']
-        master_encoder_optimizer = self.ScheduledOptim(
+        master_encoder_optimizer = ScheduledOptim(
             optim.Adam(self.master_encoder.parameters(), betas=(beta1, beta2), eps=epsilon),
             lr_mul=2,
             d_model=self.embedding_size,
             n_warmup_steps=num_warmup_steps)
 
-        master_decoder_optimizer = self.ScheduledOptim(
+        master_decoder_optimizer = ScheduledOptim(
             optim.Adam(self.master_decoder.parameters(), betas=(beta1, beta2), eps=epsilon),
             lr_mul=2,
             d_model=self.embedding_size,
             n_warmup_steps=num_warmup_steps)
 
-
-
+        self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, loss, metric, epochs, master_encoder_optimizer, master_decoder_optimizer, verbose=verbose, plot=plot)
