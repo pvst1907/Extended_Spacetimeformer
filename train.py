@@ -93,7 +93,7 @@ def train_torch(xformer,
                 epochs,
                 master_encoder_optimizer,
                 master_decoder_optimizer,
-                patience=5,
+                patience=100,
                 verbose=False,
                 plot=False):
     min_loss = np.nan
