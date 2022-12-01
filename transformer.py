@@ -79,5 +79,4 @@ class Transformer(nn.Module):
             lr_mul=2,
             d_model=self.embedding_size,
             n_warmup_steps=num_warmup_steps)
-
         self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, loss, metric, epochs, master_encoder_optimizer, master_decoder_optimizer, verbose=verbose, plot=plot)

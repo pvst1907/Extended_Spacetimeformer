@@ -64,23 +64,23 @@ def train_torch(xformer,
     epochs_no_improve = 0
     if plot:
         animator = Animator(xlabel='epoch', xlim=[1, epochs], legend=['training loss', 'evaluation_loss'])
-        for epoch in range(epochs):
-            train_tracker = train_epoch(xformer, train_iter, loss, master_encoder_optimizer, master_decoder_optimizer)
-            eval_tracker = evaluate_model(xformer, train_iter, metric)
-            epochs_no_improve += 1
-            if np.isnan(min_loss) or train_tracker < min_loss:
-                min_loss = train_tracker
-                state_dict = copy.deepcopy(xformer.state_dict())
-                epochs_no_improve = 0
-            if epoch > 5 and epochs_no_improve > patience:
-                xformer.load_state_dict(state_dict)
-                print('Stopped at ', epoch, train_tracker)
-                break
-            if verbose:
-                print(train_tracker)
-            if plot:
-                animator.add(epoch + 1, (train_tracker, eval_tracker))
-        return train_tracker, eval_tracker
+    for epoch in range(epochs):
+        train_tracker = train_epoch(xformer, train_iter, loss, master_encoder_optimizer, master_decoder_optimizer)
+        eval_tracker = evaluate_model(xformer, train_iter, metric)
+        epochs_no_improve += 1
+        if np.isnan(min_loss) or train_tracker < min_loss:
+            min_loss = train_tracker
+            state_dict = copy.deepcopy(xformer.state_dict())
+            epochs_no_improve = 0
+        if epoch > 5 and epochs_no_improve > patience:
+            xformer.load_state_dict(state_dict)
+            print('Stopped at ', epoch, train_tracker)
+            break
+        if plot:
+            animator.add(epoch + 1, (train_tracker, eval_tracker))
+        if verbose:
+            print(train_tracker)
+    return train_tracker, eval_tracker
 
 
 def evaluate_model(xformer, data_iter, metric):
