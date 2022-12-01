@@ -52,6 +52,7 @@ def train_epoch(xformer,
 
 def train_torch(xformer,
                 train_iter,
+                test_iter,
                 loss,
                 metric,
                 epochs,
@@ -66,7 +67,7 @@ def train_torch(xformer,
         animator = Animator(xlabel='epoch', xlim=[1, epochs], legend=['training loss', 'evaluation_loss'])
     for epoch in range(epochs):
         train_tracker = train_epoch(xformer, train_iter, loss, master_encoder_optimizer, master_decoder_optimizer)
-        eval_tracker = evaluate_model(xformer, train_iter, metric)
+        eval_tracker = evaluate_model(xformer, test_iter, metric)
         epochs_no_improve += 1
         if np.isnan(min_loss) or train_tracker < min_loss:
             min_loss = train_tracker

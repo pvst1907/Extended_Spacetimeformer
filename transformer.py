@@ -57,6 +57,7 @@ class Transformer(nn.Module):
                        batch_size,
                        num_warmup_steps,
                        optimizer_params,
+                       test_size=0.1,
                        standardize=True,
                        verbose=False,
                        plot=False):
@@ -67,7 +68,9 @@ class Transformer(nn.Module):
             sequence_std = torch.from_numpy(sequence).float()
 
         # Generate Training Set
-        train_iter = load_src_trg(sequence_std, self.max_seq_length, self.pred_offset, batch_size)
+        split = int(len(sequence_std)*(1-test_size))
+        train_iter = load_src_trg(sequence_std[:split], self.max_seq_length, self.pred_offset, batch_size)
+        test_iter = load_src_trg(sequence_std[split:], self.max_seq_length, self.pred_offset, batch_size)
 
         beta1, beta2, epsilon = optimizer_params['beta1'], optimizer_params['beta2'], optimizer_params['epsilon']
         master_encoder_optimizer = ScheduledOptim(
@@ -81,4 +84,4 @@ class Transformer(nn.Module):
             lr_mul=2,
             d_model=self.embedding_size,
             n_warmup_steps=num_warmup_steps)
-        self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, loss, metric, epochs, master_encoder_optimizer, master_decoder_optimizer, verbose=verbose, plot=plot)
+        self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, test_iter, loss, metric, epochs, master_encoder_optimizer, master_decoder_optimizer, verbose=verbose, plot=plot)
