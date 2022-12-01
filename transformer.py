@@ -17,17 +17,19 @@ class Transformer(nn.Module):
                  embedding_size,
                  num_basic_encoders,
                  num_atten_heads,
-                 num_basic_decoders):
+                 num_basic_decoders,
+                 positional_ecoding=True):
         super().__init__()
         self.pred_offset = pred_offset
         self.input_size = input_size
         self.output_size = output_size
         self.max_seq_length = max_seq_length
         self.embedding_size = embedding_size
+        self.positional_ecoding = positional_ecoding
         self.scores = {}
 
-        self.master_encoder = MasterEncoder(self, num_basic_encoders, num_atten_heads)
-        self.master_decoder = MasterDecoderWithMasking(self, num_basic_decoders, num_atten_heads)
+        self.master_encoder = MasterEncoder(self, num_basic_encoders, num_atten_heads, self.positional_ecoding)
+        self.master_decoder = MasterDecoderWithMasking(self, num_basic_decoders, num_atten_heads, self.positional_ecoding)
 
     def forward(self, source, target):
         source = self. master_encoder(source)
