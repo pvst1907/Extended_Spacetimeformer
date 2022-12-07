@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from attention import LocalSelfAttention, GlobalSelfAttention, LocalCrossAttention, GlobalCrossAttention
 from pcoding import EmbeddingGenerator
@@ -12,7 +13,7 @@ class Decoder(nn.Module):
         self.embedding_size_variable = xformer.embedding_size_variable
         self.embedding_size = xformer.embedding_size
 
-        self.target_embedding = EmbeddingGenerator()
+        self.target_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable, self.input_size, self.max_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm1 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
@@ -38,12 +39,11 @@ class Decoder(nn.Module):
         # Output Layer in: (N_w x M) out: (N_w x 1))
         self.output_layer = nn.Linear(in_features=xformer.embedding_size, out_features=xformer.output_size)
 
-
     def forward(self, sequence_trg, sequence_src):
         sequence_trg = sequence_trg.float()
         sequence_src = sequence_src.float()
-        # TODO: Add Time & TS Index Series Input
-        # TODO: Flattening & Create Index Series
+        time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence_trg.size(), 1), 2), 1, 2)
+        variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence_trg.shape[2],), 1), (sequence_trg.shape[0], sequence_trg.shape[1], 1)), 1), 1, 2)
         # TODO: Add Target Padding
         embedded_sequence_trg = self.target_embedding(sequence_trg, time_index_sequence, variable_index_sequence)
         normed_sequence_trg = self.norm1(embedded_sequence_trg)

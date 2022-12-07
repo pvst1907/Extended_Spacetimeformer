@@ -4,7 +4,7 @@ import torch.optim as optim
 from utils import load_src_trg
 from encoder import Encoder
 from decoder import Decoder
-from train import train_torch, ScheduledOptim
+from train import train_torch
 from sklearn import preprocessing
 
 
@@ -34,6 +34,7 @@ class SpaceTimeFormer(nn.Module):
         output = self.decoder(target, source)
         return output
 
+    # TODO: Rewrite
     def predict(self, sequence, standardize=True):
         if standardize:
             scaler = preprocessing.MinMaxScaler().fit(sequence)
@@ -53,8 +54,7 @@ class SpaceTimeFormer(nn.Module):
                        metric,
                        epochs,
                        batch_size,
-                       num_warmup_steps,
-                       optimizer_params,
+                       learning_rate,
                        test_size=0.1,
                        standardize=True,
                        verbose=False,
@@ -70,16 +70,7 @@ class SpaceTimeFormer(nn.Module):
         train_iter = load_src_trg(sequence_std[:split], self.max_seq_length, self.pred_offset, batch_size)
         test_iter = load_src_trg(sequence_std[split:], self.max_seq_length, self.pred_offset, batch_size)
 
-        beta1, beta2, epsilon = optimizer_params['beta1'], optimizer_params['beta2'], optimizer_params['epsilon']
-        master_encoder_optimizer = ScheduledOptim(
-            optim.Adam(self.master_encoder.parameters(), betas=(beta1, beta2), eps=epsilon),
-            lr_mul=2,
-            d_model=self.embedding_size,
-            n_warmup_steps=num_warmup_steps)
+        encoder_optimizer = optim.Adam(self.encoder.parameters(), lr=learning_rate)
+        decoder_optimizer = optim.Adam(self.decoder.parameters(), lr=learning_rate)
 
-        master_decoder_optimizer = ScheduledOptim(
-            optim.Adam(self.master_decoder.parameters(), betas=(beta1, beta2), eps=epsilon),
-            lr_mul=2,
-            d_model=self.embedding_size,
-            n_warmup_steps=num_warmup_steps)
-        self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, test_iter, loss, metric, epochs, master_encoder_optimizer, master_decoder_optimizer, verbose=verbose, plot=plot)
+        self.scores['Train'], self.scores['Evaluation'] = train_torch(self, train_iter, test_iter, loss, metric, epochs, encoder_optimizer, decoder_optimizer, verbose=verbose, plot=plot)

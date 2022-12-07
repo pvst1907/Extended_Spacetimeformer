@@ -96,7 +96,7 @@ class LocalCrossAttention(nn.Module):
         ])
 
     def forward(self, basic_decoder_out, final_encoder_out):  # Dimension basic_decoder_out: (N_i x M), Dimension final_encoder_out: (N_w x M)
-        concat_out_from_atten_heads = torch.zeros(sequence.shape[0], self.max_seq_length, self.qkv_size).float()
+        concat_out_from_atten_heads = torch.zeros(basic_decoder_out.shape[0], self.max_seq_length, self.qkv_size).float()
         # Cut Input According to Number of Input Time Series
         for i in range(self.input_size):
             # Dimensions basic_decoder_slice: (N_i x s_qkv)
