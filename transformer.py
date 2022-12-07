@@ -2,38 +2,36 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from utils import load_src_trg
-from encoder import MasterEncoder
-from decoder import MasterDecoderWithMasking
+from encoder import Encoder
+from decoder import Decoder
 from train import train_torch, ScheduledOptim
 from sklearn import preprocessing
 
 
-class Transformer(nn.Module):
+class SpaceTimeFormer(nn.Module):
     def __init__(self,
                  pred_offset,
                  input_size,
                  output_size,
-                 max_seq_length,
-                 embedding_size,
-                 num_basic_encoders,
-                 num_atten_heads,
-                 num_basic_decoders,
-                 positional_ecoding=True):
+                 seq_length,
+                 embedding_size_time,
+                 embedding_size_variable):
         super().__init__()
         self.pred_offset = pred_offset
         self.input_size = input_size
         self.output_size = output_size
-        self.max_seq_length = max_seq_length
-        self.embedding_size = embedding_size
-        self.positional_ecoding = positional_ecoding
+        self.max_seq_length = seq_length*input_size
+        self.embedding_size_time = embedding_size_time
+        self.embedding_size_variable = embedding_size_variable
+        self.embedding_size = 1 + embedding_size_time + embedding_size_variable
         self.scores = {}
 
-        self.master_encoder = MasterEncoder(self, num_basic_encoders, num_atten_heads, self.positional_ecoding)
-        self.master_decoder = MasterDecoderWithMasking(self, num_basic_decoders, num_atten_heads, self.positional_ecoding)
+        self.encoder = Encoder(self)
+        self.decoder = Decoder(self)
 
     def forward(self, source, target):
-        source = self. master_encoder(source)
-        output = self.master_decoder(target, source)
+        source = self.encoder(source)
+        output = self.decoder(target, source)
         return output
 
     def predict(self, sequence, standardize=True):
