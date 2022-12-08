@@ -17,8 +17,8 @@ def train_epoch(xformer,
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
         l.mean().backward()
-        encoder_optimizer.step_and_update_lr()
-        decoder_optimizer.step_and_update_lr()
+        encoder_optimizer.step()
+        decoder_optimizer.step()
     tracker.add(float(l.sum()), trg_y.numel())
     return tracker[0] / tracker[1]
 

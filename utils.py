@@ -4,26 +4,27 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 
-def load_src_trg(sequence, sequence_length, offset, batch_size=1):
-    dataset = SequenceDataset(sequence, sequence_length, offset)
+def load_src_trg(source, target, sequence_length, offset, batch_size=1):
+    dataset = SequenceDataset(source, target, sequence_length, offset)
     src_trg = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     return src_trg
 
 
 class SequenceDataset(Dataset):
-    def __init__(self, sequence, sequence_length=5, offset=0):
+    def __init__(self, source, target, sequence_length=5, offset=0):
         self.sequence_length = sequence_length
         self.offset = offset
-        self.sequence = sequence
+        self.source = source
+        self.target = target
 
     def __len__(self):
-        return self.sequence.shape[1] - self.sequence_length + 1
+        return self.source.shape[1] - self.sequence_length + 1
 
     def __getitem__(self, i):
-        i = i if i + self.sequence_length + self.offset < (self.sequence.shape[1] - self.sequence_length - self.offset) else 0
-        src = self.sequence[:, i:i+self.sequence_length]
-        trg = self.sequence[:, i + self.sequence_length - 1:i + self.sequence_length + self.offset - 1]
-        trg_y = self.sequence[:, i + self.sequence_length:i + self.sequence_length + self.offset]
+        i = i if i + self.sequence_length + self.offset < (self.source.shape[1] - self.sequence_length - self.offset) else 0
+        src = self.source[:, i:i+self.sequence_length]
+        trg = self.target[:, i + self.sequence_length - 1:i + self.sequence_length + self.offset - 1]
+        trg_y = self.target[:, i + self.sequence_length:i + self.sequence_length + self.offset]
         return src, trg, trg_y
 
 

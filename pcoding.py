@@ -8,7 +8,7 @@ class EmbeddingGenerator(nn.Module):
         self.variable_emb_generator = VariableEmbedding(input_size, embedding_size_variable)
 
     def forward(self, sequence, time_index_sequence, variable_index_sequence):
-        var_embedding = self.variable_emb_generator(torch.squeeze(variable_index_sequence)).transpose(2, 1)
+        var_embedding = self.variable_emb_generator(torch.squeeze(variable_index_sequence).long())
         return torch.cat((sequence, var_embedding), 2)
 
 

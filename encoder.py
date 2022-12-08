@@ -17,11 +17,11 @@ class Encoder(nn.Module):
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm1 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.local_attention_layer = LocalSelfAttention(xformer, self.input_size, self.embedding_size)
+        self.local_attention_layer = LocalSelfAttention(self.input_size, self.max_seq_length, self.embedding_size, self.embedding_size)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm2 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_attention_layer = GlobalSelfAttention(xformer, self.embedding_size)
+        self.global_attention_layer = GlobalSelfAttention(self.max_seq_length, self.embedding_size, self.embedding_size)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm3 = nn.LayerNorm(self.embedding_size)
         # FFN  (in: (N_w x M) out: (N_w x M))
@@ -30,10 +30,10 @@ class Encoder(nn.Module):
         self.norm4 = nn.LayerNorm(self.embedding_size)
 
     def forward(self, sequence):
-        sequence = torch.flatten(sequence, 1, 2)
-        time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence.size(), 1), 2), 1, 2)
-        variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence.shape[2], ), 1), (sequence.shape[0], sequence.shape[1], 1)), 1), 1, 2)
-        embedded_sequence = self.context_embedding(sequence, time_index_sequence, variable_index_sequence)
+        sequence_flat = torch.unsqueeze(torch.flatten(sequence, 1, 2), dim=2)
+        time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence.size(), 1), -1), 1, 2) -1
+        variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence.shape[2], ), 1), (sequence.shape[0], sequence.shape[1], 1)), 1), 1, 2) -1
+        embedded_sequence = self.context_embedding(sequence_flat, time_index_sequence, variable_index_sequence)
         normed_sequence = self.norm1(embedded_sequence)
         local_attention = self.local_attention_layer(normed_sequence)
         normed_local_attention = self.norm2(embedded_sequence + local_attention)

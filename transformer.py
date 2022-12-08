@@ -20,6 +20,7 @@ class SpaceTimeFormer(nn.Module):
         self.pred_offset = pred_offset
         self.input_size = input_size
         self.output_size = output_size
+        self.seq_length = seq_length*output_size
         self.max_seq_length = seq_length*input_size
         self.embedding_size_time = embedding_size_time
         self.embedding_size_variable = embedding_size_variable
@@ -40,7 +41,7 @@ class SpaceTimeFormer(nn.Module):
             source = torch.from_numpy(scaler.transform(sequence)).float()
         else:
             source = torch.from_numpy(sequence).float()
-        target = torch.zeros_like(source)
+        target = torch.zeros((self.input, self.seq_length))
         target[:, 0] = source[:, -1]
         for i in range(1, self.pred_offset):
             pred = self.forward(torch.unsqueeze(source, dim=0), torch.unsqueeze(target, dim=0))
@@ -48,26 +49,30 @@ class SpaceTimeFormer(nn.Module):
         return torch.squeeze(pred).detach().numpy()
 
     def start_training(self,
-                       sequence,
+                       source,
+                       target,
                        loss,
                        metric,
                        epochs,
                        batch_size,
                        learning_rate,
                        test_size=0.1,
-                       standardize=True,
+                       standardize=False,
                        verbose=False,
                        plot=False):
         if standardize:
-            scaler = preprocessing.MinMaxScaler().fit(sequence)
-            sequence_std = torch.from_numpy(scaler.transform(sequence)).float()
+            scaler = preprocessing.MinMaxScaler().fit(source)
+            source = torch.from_numpy(scaler.transform(source)).float()
+            scaler = preprocessing.MinMaxScaler().fit(target)
+            target = torch.from_numpy(scaler.transform(target)).float()
         else:
-            sequence_std = torch.from_numpy(sequence).float()
+            source = torch.from_numpy(source).float()
+            target = torch.from_numpy(target).float()
 
         # Generate Training Set
-        split = int(len(sequence_std)*(1-test_size))
-        train_iter = load_src_trg(sequence_std[:, split], self.max_seq_length, self.pred_offset, batch_size)
-        test_iter = load_src_trg(sequence_std[:, split], self.max_seq_length, self.pred_offset, batch_size)
+        split = int(source.shape[1]*(1-test_size))
+        train_iter = load_src_trg(source[:, :split], target[:, :split], self.seq_length, self.pred_offset, batch_size)
+        test_iter = load_src_trg(source[:, split:], target[:, split:], self.seq_length, self.pred_offset, batch_size)
 
         encoder_optimizer = optim.Adam(self.encoder.parameters(), lr=learning_rate)
         decoder_optimizer = optim.Adam(self.decoder.parameters(), lr=learning_rate)
