@@ -34,7 +34,6 @@ class SpaceTimeFormer(nn.Module):
         output = self.decoder(target, source)
         return output
 
-    # TODO: Rewrite
     def predict(self, sequence, standardize=True):
         if standardize:
             scaler = preprocessing.MinMaxScaler().fit(sequence)
@@ -42,7 +41,7 @@ class SpaceTimeFormer(nn.Module):
         else:
             source = torch.from_numpy(sequence).float()
         target = torch.zeros_like(source)
-        target[0, :] = source[-1, :]
+        target[:, 0] = source[:, -1]
         for i in range(1, self.pred_offset):
             pred = self.forward(torch.unsqueeze(source, dim=0), torch.unsqueeze(target, dim=0))
             target[i, :] = pred[0, i-1, :]
@@ -67,8 +66,8 @@ class SpaceTimeFormer(nn.Module):
 
         # Generate Training Set
         split = int(len(sequence_std)*(1-test_size))
-        train_iter = load_src_trg(sequence_std[:split], self.max_seq_length, self.pred_offset, batch_size)
-        test_iter = load_src_trg(sequence_std[split:], self.max_seq_length, self.pred_offset, batch_size)
+        train_iter = load_src_trg(sequence_std[:, split], self.max_seq_length, self.pred_offset, batch_size)
+        test_iter = load_src_trg(sequence_std[:, split], self.max_seq_length, self.pred_offset, batch_size)
 
         encoder_optimizer = optim.Adam(self.encoder.parameters(), lr=learning_rate)
         decoder_optimizer = optim.Adam(self.decoder.parameters(), lr=learning_rate)
