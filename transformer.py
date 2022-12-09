@@ -41,7 +41,7 @@ class SpaceTimeFormer(nn.Module):
             source = torch.from_numpy(scaler.transform(sequence)).float()
         else:
             source = torch.from_numpy(sequence).float()
-        target = torch.zeros((self.input, self.seq_length))
+        target = torch.zeros((self.input_size, self.seq_length))
         target[:, 0] = source[:, -1]
         for i in range(1, self.pred_offset):
             pred = self.forward(torch.unsqueeze(source, dim=0), torch.unsqueeze(target, dim=0))
