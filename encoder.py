@@ -12,22 +12,23 @@ class Encoder(nn.Module):
         self.embedding_size_time = xformer.embedding_size_time
         self.embedding_size_variable = xformer.embedding_size_variable
         self.embedding_size = xformer.embedding_size
+        self.s_qkv = xformer.s_qkv
 
         self.context_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable, self.input_size, self.src_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm1 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.local_attention_layer = LocalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.embedding_size)
+        self.local_attention_layer = LocalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm2 = nn.LayerNorm(self.embedding_size)
+        self.norm2 = nn.LayerNorm(self.s_qkv)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_attention_layer = GlobalSelfAttention(self.src_seq_length, self.embedding_size, self.embedding_size)
+        self.global_attention_layer = GlobalSelfAttention(self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm3 = nn.LayerNorm(self.embedding_size)
+        self.norm3 = nn.LayerNorm(self.s_qkv)
         # FFN  (in: (N_w x M) out: (N_w x M))
-        self.W1 = nn.Linear(self.embedding_size, self.embedding_size)
+        self.W1 = nn.Linear(self.s_qkv, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm4 = nn.LayerNorm(self.embedding_size)
+        self.norm4 = nn.LayerNorm(self.s_qkv)
 
     def forward(self, sequence):
         # Flattening

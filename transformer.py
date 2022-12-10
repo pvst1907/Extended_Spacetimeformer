@@ -26,6 +26,7 @@ class SpaceTimeFormer(nn.Module):
         self.embedding_size_time = embedding_size_time
         self.embedding_size_variable = embedding_size_variable
         self.embedding_size = 1 + embedding_size_time + embedding_size_variable
+        self.s_qkv = self.embedding_size
         self.scores = {}
 
         self.encoder = Encoder(self)
@@ -36,7 +37,6 @@ class SpaceTimeFormer(nn.Module):
         output = self.decoder(target, source)
         return output
 
-    # TODO: Rewrite
     def predict(self, source, target_stub, standardize=True):
         if standardize:
             scaler = preprocessing.MinMaxScaler().fit(source)

@@ -13,32 +13,33 @@ class Decoder(nn.Module):
         self.embedding_size_time = xformer.embedding_size_time
         self.embedding_size_variable = xformer.embedding_size_variable
         self.embedding_size = xformer.embedding_size
+        self.s_qkv = xformer.s_qkv
 
         self.target_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable, self.output_size, self.trg_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm1 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.local_attention_layer = LocalSelfAttention(self.output_size, self.trg_seq_length, self.embedding_size, self.embedding_size, masked=True)
+        self.local_attention_layer = LocalSelfAttention(self.output_size, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm2 = nn.LayerNorm(self.embedding_size)
+        self.norm2 = nn.LayerNorm(self.s_qkv)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_attention_layer = GlobalSelfAttention(self.trg_seq_length, self.embedding_size, self.embedding_size, masked=True)
+        self.global_attention_layer = GlobalSelfAttention(self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm3 = nn.LayerNorm(self.embedding_size)
+        self.norm3 = nn.LayerNorm(self.s_qkv)
         # Cross-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.local_cross_attention_layer = LocalCrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.embedding_size, masked=True)
+        self.local_cross_attention_layer = LocalCrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm4 = nn.LayerNorm(self.embedding_size)
+        self.norm4 = nn.LayerNorm(self.s_qkv)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_cross_attention_layer = GlobalCrossAttention(self.src_seq_length, self.trg_seq_length, self.embedding_size, self.embedding_size, masked=True)
+        self.global_cross_attention_layer = GlobalCrossAttention(self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm5 = nn.LayerNorm(self.embedding_size)
+        self.norm5 = nn.LayerNorm(self.s_qkv)
         # FFN  (in: (N_w x M) out: (N_w x M))
-        self.W1 = nn.Linear(self.embedding_size, self.embedding_size)
+        self.W1 = nn.Linear(self.s_qkv, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm6 = nn.LayerNorm(self.embedding_size)
+        self.norm6 = nn.LayerNorm(self.s_qkv)
         # Output Layer in: (N_w x M) out: (N_w x 1))
-        self.output_layer = nn.Linear(in_features=xformer.embedding_size, out_features=xformer.output_size)
+        self.output_layer = nn.Linear(in_features=xformer.s_qkv, out_features=xformer.output_size)
 
     def forward(self, sequence_trg, sequence_src):
         # Flattening
