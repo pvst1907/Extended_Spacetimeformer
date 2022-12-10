@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import torch
+import torch.nn as nn
 from utils import Accumulator, Animator
 
 
@@ -17,6 +18,7 @@ def train_epoch(xformer,
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
         l.mean().backward()
+        nn.utils.clip_grad_norm_(xformer.parameters(), 5)
         encoder_optimizer.step()
         decoder_optimizer.step()
     tracker.add(float(l.sum()), trg_y.numel())
