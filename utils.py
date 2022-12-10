@@ -18,13 +18,13 @@ class SequenceDataset(Dataset):
         self.target = target
 
     def __len__(self):
-        return self.source.shape[1] - self.sequence_length + 1
+        return self.source.shape[1] - self.sequence_length - self.offset + 2
 
     def __getitem__(self, i):
-        i = i if i + self.sequence_length + self.offset < (self.source.shape[1] - self.sequence_length - self.offset) else 0
-        src = self.source[:, i:i+self.sequence_length]
-        trg = self.target[:, i + self.sequence_length - 1:i + self.sequence_length + self.offset - 1]
-        trg_y = self.target[:, i + self.sequence_length:i + self.sequence_length + self.offset]
+        i = i if i + self.sequence_length + self.offset < (self.source.shape[1] - self.sequence_length - self.offset + 1) else 0
+        src = self.source[:, i:i + self.sequence_length]
+        trg = self.target[:, i + 1:i + self.sequence_length + self.offset]
+        trg_y = self.target[:, i + 1:i + self.sequence_length + self.offset]
         return src, trg, trg_y
 
 

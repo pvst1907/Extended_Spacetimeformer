@@ -7,8 +7,8 @@ from pcoding import EmbeddingGenerator
 class Decoder(nn.Module):
     def __init__(self, xformer):
         super().__init__()
-        self.trg_seq_length = xformer.seq_length  # N_w
-        self.src_seq_length = xformer.max_seq_length
+        self.trg_seq_length = xformer.trg_seq_length  # N_w
+        self.src_seq_length = xformer.src_seq_length
         self.output_size = xformer.output_size
         self.embedding_size_time = xformer.embedding_size_time
         self.embedding_size_variable = xformer.embedding_size_variable
@@ -41,22 +41,47 @@ class Decoder(nn.Module):
         self.output_layer = nn.Linear(in_features=xformer.embedding_size, out_features=xformer.output_size)
 
     def forward(self, sequence_trg, sequence_src):
-
+        # Flattening
         sequence_trg_flat = torch.unsqueeze(torch.flatten(sequence_trg, 1, 2), dim=2)
         sequence_src_flat = torch.unsqueeze(torch.flatten(sequence_src, 1, 2), dim=2)
-        time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence_trg.size(), 1), 2), 1, 2)-1
+
+        # Time & Variable Encoding/Embedding
+        time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence_trg.size(), 1), 2), 1, 2)
         variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence_trg.shape[2],), 1), (sequence_trg.shape[0], sequence_trg.shape[1], 1)), 1), 1, 2)-1
-        # TODO: Add Target Padding
         embedded_sequence_trg = self.target_embedding(sequence_trg_flat, time_index_sequence, variable_index_sequence)
+
+        # Norm
         normed_sequence_trg = self.norm1(embedded_sequence_trg)
+
+        # Local Self Attetion
         local_attention_trg = self.local_attention_layer(normed_sequence_trg)
+
+        # Norm
         normed_local_attention_trg = self.norm2(embedded_sequence_trg + local_attention_trg)
+
+        # Global Self Attention
         global_attention_trg = self.global_attention_layer(normed_local_attention_trg)
+
+        # Norm
         normed_global_attention_trg = self.norm3(normed_local_attention_trg + global_attention_trg)
+
+        # Local Cross Attention
         local_attention = self.local_cross_attention_layer(normed_global_attention_trg, sequence_src_flat)
+
+        # Norm
         normed_local_attention = self.norm4(normed_global_attention_trg + local_attention)
+
+        # Global Cross Attention
         global_attention = self.global_cross_attention_layer(normed_local_attention, sequence_src_flat)
+
+        # Norm
         normed_global_attention = self.norm5(normed_local_attention + global_attention)
+
+        # Linear Layer & ReLU
         decoder_out = nn.ReLU()(self.W1(normed_global_attention))
+
+        # Norm
         normed_encoder_out = self.norm6(normed_global_attention + decoder_out)
+
+        # Linear Layer
         return self.output_layer(normed_encoder_out)
