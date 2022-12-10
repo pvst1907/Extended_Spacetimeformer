@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from Performer import Performer
 
 
 class SafeSoftmax(nn.Module):
@@ -48,13 +47,12 @@ class GlobalSelfAttention(nn.Module):
 
 
 class AttentionHead(nn.Module):
-    def __init__(self, seq_length, emb_size, qkv_size, masked=False , performer = False):
+    def __init__(self, seq_length, emb_size, qkv_size, masked=False):
         super().__init__()
         self.qkv_size = qkv_size  # s_qkv
         self.emb_size = emb_size  # M
         self.seq_length = seq_length  # N_w
         self.masked = masked
-        self.performer = Performer() if performer else None
 
         # Dimensions W_q: (M x s_qkv)
         # Dimensions W_Q: (N_w*M) x (N_w*s_qkv)
@@ -83,17 +81,16 @@ class AttentionHead(nn.Module):
         V = V.view(sent_embed_slice.shape[0], self.seq_length, self.qkv_size)
 
         # Calculating Attention \frac{softmax(Q*K^T)}{\sqrt{M}}*V
-        if self.performer:
-            Z = self.performer(Q, K, V, sent_embed_slice, self.max_seq_length, self.qkv_size)
-        else:
-            A = K.transpose(2, 1)  # (s_qkv x N_w)
-            QK_dot_prod = Q @ A  # (N_w x N_w)
-            if self.masked:
-                QK_dot_prod += torch.triu(torch.full(QK_dot_prod.size(), -1e20), diagonal=1)
-            rowwise_softmax_normalizations = self.softmax(QK_dot_prod)
-            Z = rowwise_softmax_normalizations @ V  # (N_w x s_qkv)
-            coeff = 1.0/torch.sqrt(torch.tensor([self.qkv_size]).float())
-            Z = coeff * Z  # (N_w x s_qkv)
+        A = K.transpose(2, 1)  # (s_qkv x N_w)
+        QK_dot_prod = Q @ A  # (N_w x N_w)
+        if self.masked:
+            # QK_dot_prod += torch.triu(torch.full(QK_dot_prod.size(), -1e20), diagonal=1)
+            QK_dot_prod += torch.triu(
+                torch.full((QK_dot_prod.shape[0], QK_dot_prod.shape[2], QK_dot_prod.shape[1]), -1e20),diagonal=1).transpose(1, 2)
+        rowwise_softmax_normalizations = self.softmax(QK_dot_prod)
+        Z = rowwise_softmax_normalizations @ V  # (N_w x s_qkv)
+        coeff = 1.0/torch.sqrt(torch.tensor([self.qkv_size]).float())
+        Z = coeff * Z  # (N_w x s_qkv)
         return Z
 
 
@@ -175,7 +172,8 @@ class CrossAttentionHead(nn.Module):
         A = K.transpose(2, 1)  # (s_qkv x N_w)
         QK_dot_prod = Q @ A  # (N_w x N_w)
         if self.masked:
-            QK_dot_prod += torch.triu(torch.full(QK_dot_prod.size(), -1e20), diagonal=1)
+            # QK_dot_prod += torch.triu(torch.full(QK_dot_prod.size(), -1e20), diagonal=1)
+            QK_dot_prod += torch.triu(torch.full((QK_dot_prod.shape[0], QK_dot_prod.shape[2], QK_dot_prod.shape[1]), -1e20), diagonal=1).transpose(1, 2)
         rowwise_softmax_normalizations = self.softmax(QK_dot_prod)
         Z = rowwise_softmax_normalizations @ V  # (N_w x s_qkv)
         coeff = 1.0 / torch.sqrt(torch.tensor([self.qkv_size]).float())

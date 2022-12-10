@@ -20,11 +20,13 @@ class SpaceTimeFormer(nn.Module):
         self.pred_offset = pred_offset
         self.input_size = input_size
         self.output_size = output_size
-        self.seq_length = seq_length*output_size
-        self.max_seq_length = seq_length*input_size
+        self.seq_length = seq_length
+        self.src_seq_length = seq_length * input_size
+        self.trg_seq_length = (seq_length+(pred_offset-1))*output_size
         self.embedding_size_time = embedding_size_time
         self.embedding_size_variable = embedding_size_variable
         self.embedding_size = 1 + embedding_size_time + embedding_size_variable
+        self.s_qkv = self.embedding_size
         self.scores = {}
 
         self.encoder = Encoder(self)
@@ -35,18 +37,22 @@ class SpaceTimeFormer(nn.Module):
         output = self.decoder(target, source)
         return output
 
-    def predict(self, sequence, standardize=True):
+    def predict(self, source, target_stub, standardize=True):
         if standardize:
-            scaler = preprocessing.MinMaxScaler().fit(sequence)
-            source = torch.from_numpy(scaler.transform(sequence)).float()
+            scaler = preprocessing.MinMaxScaler().fit(source)
+            source = torch.from_numpy(scaler.transform(source)).float()
+
+            scaler = preprocessing.MinMaxScaler().fit(target_stub)
+            target_stub = torch.from_numpy(scaler.transform(target_stub)).float()
         else:
-            source = torch.from_numpy(sequence).float()
-        target = torch.zeros((self.input_size, self.seq_length))
-        target[:, 0] = source[:, -1]
-        for i in range(1, self.pred_offset):
+            source = torch.from_numpy(source).float()
+            target_stub = torch.from_numpy(target_stub).float()
+
+        target = torch.cat((target_stub, torch.zeros((self.output_size, self.pred_offset))), 1)
+        for i in range(self.seq_length-1, self.seq_length + self.pred_offset-1):
             pred = self.forward(torch.unsqueeze(source, dim=0), torch.unsqueeze(target, dim=0))
-            target[i, :] = pred[0, i-1, :]
-        return torch.squeeze(pred).detach().numpy()
+            target[:, i] = pred[0, i, :]
+        return torch.squeeze(pred[0, -self.pred_offset, :]).detach().numpy()
 
     def start_training(self,
                        source,
@@ -61,10 +67,10 @@ class SpaceTimeFormer(nn.Module):
                        verbose=False,
                        plot=False):
         if standardize:
-            scaler = preprocessing.MinMaxScaler().fit(source)
-            source = torch.from_numpy(scaler.transform(source)).float()
-            scaler = preprocessing.MinMaxScaler().fit(target)
-            target = torch.from_numpy(scaler.transform(target)).float()
+            scaler = preprocessing.MinMaxScaler().fit(source.transpose())
+            source = torch.from_numpy(scaler.transform(source.transpose()).transpose()).float()
+            scaler = preprocessing.MinMaxScaler().fit(target.transpose())
+            target = torch.from_numpy(scaler.transform(target.transpose()).transpose()).float()
         else:
             source = torch.from_numpy(source).float()
             target = torch.from_numpy(target).float()
