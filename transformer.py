@@ -14,18 +14,24 @@ class SpaceTimeFormer(nn.Module):
                  input_size,
                  output_size,
                  seq_length,
+                 sectors_list,
+                 datetime_index,
                  embedding_size_time,
-                 embedding_size_variable):
+                 embedding_size_variable,
+                 embedding_size_sector):
         super().__init__()
         self.pred_offset = pred_offset
         self.input_size = input_size
         self.output_size = output_size
         self.seq_length = seq_length
+        self.sector_list = sectors_list
+        self.datetime_index = datetime_index
         self.src_seq_length = seq_length * input_size
         self.trg_seq_length = (seq_length+(pred_offset-1))*output_size
         self.embedding_size_time = embedding_size_time
         self.embedding_size_variable = embedding_size_variable
-        self.embedding_size = 1 + embedding_size_time + embedding_size_variable
+        self.embedding_size_sector = embedding_size_sector
+        self.embedding_size = 1 + embedding_size_time + embedding_size_variable + embedding_size_sector
         self.s_qkv = self.embedding_size
         self.scores = {}
 

@@ -1,9 +1,8 @@
 import torch.nn as nn
 import torch
 
-
 class EmbeddingGenerator(nn.Module):
-    def __init__(self, embedding_size_time, embedding_size_variable, input_size, max_seq_length):
+    def __init__(self, embedding_size_time, embedding_size_variable, embedding_size_sector, input_size, max_seq_length):
         super().__init__()
         self.input_size = input_size
         self.input_dim = max_seq_length//input_size
@@ -11,12 +10,14 @@ class EmbeddingGenerator(nn.Module):
 
         self.variable_emb_generator = VariableEmbedding(input_size, embedding_size_variable)
         self.time_2_vec = Time2Vec(input_dim=self.input_dim, embed_dim=self.emb_dim)
+        self.sector_emb_generator = VariableEmbedding(input_size, embedding_size_sector)
 
-    def forward(self, sequence, time_index_sequence, variable_index_sequence):
+    def forward(self, sequence, time_index_sequence, variable_index_sequence, sector_index_sequence):
+        sect_embedding = self.sector_emb_generator(torch.squeeze(sector_index_sequence).long()).view(sequence.shape[0], sequence.shape[1], -1)
         var_embedding = self.variable_emb_generator(torch.squeeze(variable_index_sequence).long()).view(sequence.shape[0], sequence.shape[1], -1)
         time_embedding = self.time_2_vec(torch.squeeze(time_index_sequence[0, :self.input_dim]).long()).view(1, self.input_dim, self.emb_dim//self.input_dim)
         time_embedding = time_embedding.repeat(sequence.shape[0], self.input_size, 1)
-        return torch.cat((sequence, var_embedding, time_embedding), 2)
+        return torch.cat((sequence, var_embedding, time_embedding,sect_embedding), 2)
 
 
 class VariableEmbedding(nn.Module):
@@ -24,6 +25,8 @@ class VariableEmbedding(nn.Module):
     def __init__(self, num_variables, embedding_size):
         super().__init__()
         self.embed = nn.Embedding(num_variables, embedding_size)
+        nn.init.xavier_uniform_(self.embed.weight)
+
 
     def forward(self, sequence):
         return self.embed(sequence)

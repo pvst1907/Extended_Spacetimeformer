@@ -9,12 +9,15 @@ class Encoder(nn.Module):
         super().__init__()
         self.src_seq_length = xformer.src_seq_length  # N_w
         self.input_size = xformer.input_size
+        self.datetime = xformer.datetime_index
         self.embedding_size_time = xformer.embedding_size_time
         self.embedding_size_variable = xformer.embedding_size_variable
+        self.embedding_size_sector = xformer.embedding_size_sector
         self.embedding_size = xformer.embedding_size
+        self.sec_list = xformer.sector_list
         self.s_qkv = xformer.s_qkv
 
-        self.context_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable, self.input_size, self.src_seq_length)
+        self.context_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable,self.embedding_size_sector, self.input_size, self.src_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm1 = nn.LayerNorm(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
@@ -33,11 +36,13 @@ class Encoder(nn.Module):
     def forward(self, sequence):
         # Flattening
         sequence_flat = torch.unsqueeze(torch.flatten(sequence, 1, 2), dim=2)
-
-        # Time & Variable Encoding/Embedding
+        # Time & Variable & Sector Encoding/Embedding
         time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence.size(), 1), -1), 1, 2) -1
         variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence.shape[2], ), 1), (sequence.shape[0], sequence.shape[1], 1)), 1), 1, 2) -1
-        embedded_sequence = self.context_embedding(sequence_flat, time_index_sequence, variable_index_sequence)
+        sector_index_sequence = torch.cat([torch.ones([sequence.shape[0], sequence.shape[2]]) * i for i in self.sec_list], dim=1)
+
+
+        embedded_sequence = self.context_embedding(sequence_flat, time_index_sequence, variable_index_sequence, sector_index_sequence)
 
         # Norm
         normed_sequence = self.norm1(embedded_sequence)

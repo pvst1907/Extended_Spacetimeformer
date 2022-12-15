@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from utils import Accumulator, Animator
-
+## set anomaly detection to True
 
 def train_epoch(xformer,
                 train_iter,
@@ -18,9 +18,11 @@ def train_epoch(xformer,
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
         l.mean().backward()
-        nn.utils.clip_grad_norm_(xformer.parameters(), 5)
+        #nn.utils.clip_grad_norm_(xformer.parameters(), 3)
+        nn.utils.clip_grad_value_(xformer.parameters(), 3)
         encoder_optimizer.step()
         decoder_optimizer.step()
+
     tracker.add(float(l.sum()), trg_y.numel())
     return tracker[0] / tracker[1]
 
