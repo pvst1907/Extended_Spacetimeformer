@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from attention import LocalSelfAttention, GlobalSelfAttention, LocalCrossAttention, GlobalCrossAttention
+from attention import LocalSelfAttention, GlobalSelfAttention, CrossAttention
 from pcoding import EmbeddingGenerator
 
 
@@ -25,15 +25,15 @@ class Decoder(nn.Module):
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm2 = nn.LayerNorm(self.s_qkv)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_attention_layer = GlobalSelfAttention(self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
+        self.global_attention_layer = GlobalSelfAttention(self.output_size, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm3 = nn.LayerNorm(self.s_qkv)
         # Cross-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.local_cross_attention_layer = LocalCrossAttention(self.output_size,self.input_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
+        self.cross_attention_layer_1 = CrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=False)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm4 = nn.LayerNorm(self.s_qkv)
-        # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_cross_attention_layer = GlobalCrossAttention(self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
+        # Cross-Attention Layer Local (in: (N_w x M) out: (N_w x M))
+        self.cross_attention_layer_2 = CrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=False)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm5 = nn.LayerNorm(self.s_qkv)
         # FFN  (in: (N_w x M) out: (N_w x M))
@@ -46,7 +46,6 @@ class Decoder(nn.Module):
     def forward(self, sequence_trg, sequence_src):
         # Flattening
         sequence_trg_flat = torch.unsqueeze(torch.flatten(sequence_trg, 1, 2), dim=2)
-        # sequence_src_flat = torch.unsqueeze(torch.flatten(sequence_src, 1, 2), dim=2)
 
         # No need to flatten the source sequence as it is already flattened
         sequence_src_flat = sequence_src
@@ -73,23 +72,23 @@ class Decoder(nn.Module):
         # Norm
         normed_global_attention_trg = self.norm3(normed_local_attention_trg + global_attention_trg)
 
-        # Local Cross Attention
-        local_attention = self.local_cross_attention_layer(normed_global_attention_trg, sequence_src_flat)
+        # Cross Attention 1st Layer
+        cross_attention_1 = self.cross_attention_layer_1(normed_global_attention_trg, sequence_src_flat)
 
         # Norm
-        normed_local_attention = self.norm4(normed_global_attention_trg + local_attention)
+        normed_cross_attention = self.norm4(normed_global_attention_trg + cross_attention_1)
 
-        # Global Cross Attention
-        #global_attention = self.global_cross_attention_layer(normed_local_attention, sequence_src_flat)
+        # Cross Attention 2nd Layer
+        cross_attention_2 = self.cross_attention_layer_2(normed_cross_attention, sequence_src_flat)
 
         # Norm
-        #normed_global_attention = self.norm5(normed_local_attention + global_attention)
+        normed_cross_attention_2 = self.norm5(normed_cross_attention + cross_attention_2)
 
         # Linear Layer & ReLU
-        decoder_out = nn.ReLU()(self.W1(normed_local_attention))
+        decoder_out = nn.ReLU()(self.W1(normed_cross_attention_2))
 
         # Norm
-        normed_encoder_out = self.norm6(normed_local_attention + decoder_out)
+        normed_encoder_out = self.norm6(normed_cross_attention + decoder_out)
 
         # Linear Layer
         return self.output_layer(normed_encoder_out)

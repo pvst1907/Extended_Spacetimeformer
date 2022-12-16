@@ -25,7 +25,7 @@ class Encoder(nn.Module):
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm2 = nn.LayerNorm(self.s_qkv)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
-        self.global_attention_layer = GlobalSelfAttention(self.src_seq_length, self.embedding_size, self.s_qkv)
+        self.global_attention_layer = GlobalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
         self.norm3 = nn.LayerNorm(self.s_qkv)
         # FFN  (in: (N_w x M) out: (N_w x M))
