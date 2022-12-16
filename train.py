@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from utils import Accumulator, Animator
-## set anomaly detection to True
+
 
 def train_epoch(xformer,
                 train_iter,

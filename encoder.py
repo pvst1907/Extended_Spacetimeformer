@@ -36,11 +36,11 @@ class Encoder(nn.Module):
     def forward(self, sequence):
         # Flattening
         sequence_flat = torch.unsqueeze(torch.flatten(sequence, 1, 2), dim=2)
+
         # Time & Variable & Sector Encoding/Embedding
         time_index_sequence = torch.flatten(torch.cumsum(torch.full(sequence.size(), 1), -1), 1, 2) -1
         variable_index_sequence = torch.flatten(torch.cumsum(torch.tile(torch.full((sequence.shape[2], ), 1), (sequence.shape[0], sequence.shape[1], 1)), 1), 1, 2) -1
         sector_index_sequence = torch.cat([torch.ones([sequence.shape[0], sequence.shape[2]]) * i for i in self.sec_list], dim=1)
-
 
         embedded_sequence = self.context_embedding(sequence_flat, time_index_sequence, variable_index_sequence, sector_index_sequence)
 

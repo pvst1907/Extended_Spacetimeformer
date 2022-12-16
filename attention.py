@@ -45,29 +45,28 @@ class GlobalSelfAttention(nn.Module):
         self.input_size = input_size
         self.masked = masked
 
-        if masked == False:
-            self.attention_head = AttentionHead(self.seq_length, self.embedding_size, self.qkv_size, masked)
-        else:
+        if masked:
             self.seq_length_head = self.seq_length//input_size
-            self.causal_attention_heads = nn.ModuleList([AttentionHead(self.seq_length_head, self.embedding_size, qkv_size, masked) for _ in range(self.input_size)])
+            self.self_attention_heads = nn.ModuleList([AttentionHead(self.seq_length_head, self.embedding_size, qkv_size, masked) for _ in range(self.input_size)])
             self.cross_attention_heads = nn.ModuleList([CrossAttentionHead(self.seq_length_head, self.seq_length_head, self.embedding_size, qkv_size, masked) for _ in range(self.input_size**2 - self.input_size)])
-
+        else:
+            self.attention_head = AttentionHead(self.seq_length, self.embedding_size, self.qkv_size, masked)
 
     def forward(self, sequence):
-        if self.masked == False:
-            return self.attention_head(sequence)
-        else:
+        if self.masked:
             concat_out_from_atten_heads = torch.zeros(sequence.shape[0], self.seq_length, self.qkv_size).float()
             for i in range(self.input_size):
-                sequence_slice_causal = sequence[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :]
-                concat_out_from_atten_heads[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :] = self.causal_attention_heads[i](sequence_slice_causal)
+                sequence_slice_self = sequence[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :]
+                concat_out_from_atten_heads[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :] = self.self_attention_heads[i](sequence_slice_self)
                 for j in range(self.input_size):
                     if i != j:
                         sequence_slice_cross_1 = sequence[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :]
                         sequence_slice_cross_2 = sequence[:, j * self.seq_length_head: (j+1) * self.seq_length_head, :]
                         concat_out_from_atten_heads[:, i * self.seq_length_head: (i+1) * self.seq_length_head, :] += self.cross_attention_heads[i * self.input_size + j](sequence_slice_cross_2, sequence_slice_cross_1)
+        else:
+            concat_out_from_atten_heads = self.attention_head(sequence)
 
-            return concat_out_from_atten_heads
+        return concat_out_from_atten_heads
 
 
 class AttentionHead(nn.Module):
@@ -114,6 +113,7 @@ class AttentionHead(nn.Module):
         coeff = 1.0/torch.sqrt(torch.tensor([self.qkv_size]).float())
         Z = coeff * Z  # (N_w x s_qkv)
         return Z
+
 
 class CrossAttention(nn.Module):
     def __init__(self, output_size, src_seq_length, trg_seq_length, embedding_size, qkv_size, masked=False):
@@ -166,7 +166,6 @@ class CrossAttentionHead(nn.Module):
 
     def forward(self, basic_decoder_slice, final_encoder_slice):  #Dimension basic_decoder_slice (source): (N_w x M), Dimension final_encoder_slice (target): (N_w x M)
         # Dimensions Q: (N_w x s_qkv)
-
         Q = self.WQ(basic_decoder_slice.reshape(final_encoder_slice.shape[0], -1).float())
         # Dimensions K: (N_w x s_qkv)
         K = self.WK(final_encoder_slice.reshape(final_encoder_slice.shape[0], -1).float())
