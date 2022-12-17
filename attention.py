@@ -26,6 +26,32 @@ class LocalSelfAttention(nn.Module):
         return concat_out_from_atten_heads
 
 
+class StructuralSelfAttention(nn.Module):
+    def __init__(self, input_size, seq_length, embedding_size, qkv_size, indices, masked=False):
+        super().__init__()
+        self.seq_length = seq_length  # N_w
+        self.embedding_size = embedding_size  # M
+        self.qkv_size = qkv_size  # s_qkv
+        self.input_size = input_size
+        self.indices = indices.repeat_interleave(self.seq_length//self.input_size)
+        self.num_heads = torch.unique(indices).shape[0]
+        _, self.counts = torch.unique(indices, return_counts=True)
+
+        self.attention_heads = nn.ModuleList([
+            GlobalSelfAttention(input_size, (self.seq_length//self.input_size)*self.counts[_], embedding_size, qkv_size, masked=False) for _ in range(self.num_heads)
+        ])
+
+    def forward(self, sequence):  # Dimension sentence_tensor: (N_w x M)
+        concat_out_from_atten_heads = torch.zeros(sequence.shape[0], self.seq_length, self.qkv_size).float()
+        # Cut Input According to Number of Input Time Series
+        for i in range(self.num_heads):
+            # Dimensions sentence_embed_slice: (N_w x s_qkv)
+            sequence_slice = sequence[:,self.indices==i,:].reshape(sequence.shape[0],-1, sequence.shape[2])
+            # Dimensions concat_out_from_atten_heads: (N_w x s_qkv)
+            concat_out_from_atten_heads[:,self.indices==i,:] = self.attention_heads[i](sequence_slice)
+        return concat_out_from_atten_heads
+
+
 class GlobalSelfAttention(nn.Module):
     def __init__(self, input_size, seq_length, embedding_size, qkv_size, masked=False):
         super().__init__()
