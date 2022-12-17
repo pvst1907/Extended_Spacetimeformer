@@ -34,6 +34,7 @@ class Encoder(nn.Module):
         self.norm4 = nn.BatchNorm1d(self.src_seq_length)
 
     def forward(self, sequence):
+
         # Flattening
         sequence_flat = torch.unsqueeze(torch.flatten(sequence, 1, 2), dim=2)
 
@@ -53,7 +54,7 @@ class Encoder(nn.Module):
         # Norm
         normed_local_attention = self.norm2(embedded_sequence + local_attention)
 
-        # Global Self Attention
+        # Global Self Attention NaN
         global_attention = self.global_attention_layer(normed_local_attention)
 
         # Norm

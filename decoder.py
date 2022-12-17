@@ -88,7 +88,7 @@ class Decoder(nn.Module):
         decoder_out = nn.ReLU()(self.W1(normed_cross_attention_2))
 
         # Norm
-        normed_encoder_out = self.norm6(cross_attention_2 + decoder_out)
+        normed_decoder_out = self.norm6(cross_attention_2 + decoder_out)
 
         # Linear Layer
-        return self.output_layer(normed_encoder_out)
+        return self.output_layer(normed_decoder_out)
