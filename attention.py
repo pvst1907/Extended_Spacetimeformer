@@ -7,8 +7,14 @@ class SafeSoftmax(nn.Module):
         super().__init__()
 
     def forward(self, X):
-        X_denom = torch.sum(torch.exp(X), 2) + 1e-5
-        return torch.divide(torch.exp(X), torch.unsqueeze(X_denom, dim=2))
+        X_denom = torch.sum(torch.exp(X), 2) + 1e-8
+        if torch.isnan(X_denom).any():
+            print('B')
+            assert False
+        if torch.isnan(torch.divide(torch.exp(X), torch.unsqueeze(X_denom, dim=2))).any():
+            print(torch.min(X_denom))
+            assert False
+        return torch.divide(torch.exp(X + 1e-8), torch.unsqueeze(X_denom, dim=2))
 
 
 class LocalSelfAttention(nn.Module):

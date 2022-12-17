@@ -19,19 +19,19 @@ class Encoder(nn.Module):
 
         self.context_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable,self.embedding_size_sector, self.input_size, self.src_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm1 = nn.BatchNorm1d(self.src_seq_length)
+        self.norm1 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.local_attention_layer = LocalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm2 = nn.BatchNorm1d(self.src_seq_length)
+        self.norm2 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.global_attention_layer = GlobalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm3 = nn.BatchNorm1d(self.src_seq_length)
+        self.norm3 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
         # FFN  (in: (N_w x M) out: (N_w x M))
         self.W1 = nn.Linear(self.s_qkv, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm4 = nn.BatchNorm1d(self.src_seq_length)
+        self.norm4 = nn.LayerNorm((self.src_seq_length, self.embedding_size))
 
     def forward(self, sequence):
 

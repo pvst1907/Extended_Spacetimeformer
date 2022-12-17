@@ -40,6 +40,7 @@ def train_torch(xformer,
                 plot=False):
     min_loss = np.nan
     epochs_no_improve = 0
+    torch.autograd.set_detect_anomaly(True)
     if plot:
         animator = Animator(xlabel='epoch', xlim=[1, epochs], legend=['training loss', 'evaluation_loss'])
     for epoch in range(epochs):
