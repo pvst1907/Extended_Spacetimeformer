@@ -19,27 +19,27 @@ class Decoder(nn.Module):
 
         self.target_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable, self.embedding_size_sector, self.output_size, self.trg_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm1 = nn.LayerNorm([self.trg_seq_length, self.embedding_size])
+        self.norm1 = nn.BatchNorm1d(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.local_attention_layer = LocalSelfAttention(self.output_size, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm2 = nn.LayerNorm([self.trg_seq_length, self.embedding_size])
+        self.norm2 = nn.BatchNorm1d(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.global_attention_layer = GlobalSelfAttention(self.output_size, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=True)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm3 = nn.LayerNorm([self.trg_seq_length, self.embedding_size])
+        self.norm3 = nn.BatchNorm1d(self.embedding_size)
         # Cross-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.cross_attention_layer_1 = CrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=False)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm4 = nn.LayerNorm([self.trg_seq_length, self.embedding_size])
+        self.norm4 = nn.BatchNorm1d(self.embedding_size)
         # Cross-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.cross_attention_layer_2 = CrossAttention(self.output_size, self.src_seq_length, self.trg_seq_length, self.embedding_size, self.s_qkv, masked=False)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm5 = nn.LayerNorm([self.trg_seq_length, self.embedding_size])
+        self.norm5 = nn.BatchNorm1d(self.embedding_size)
         # FFN  (in: (N_w x M) out: (N_w x M))
         self.W1 = nn.Linear(self.s_qkv, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm6 = nn.LayerNorm([trg_seq_length, self.embedding_size])
+        self.norm6 = nn.BatchNorm1d(self.embedding_size)
         # Output Layer in: (N_w x M) out: (N_w x 1))
         self.output_layer = nn.Linear(in_features=xformer.s_qkv, out_features=xformer.output_size)
 
@@ -58,37 +58,37 @@ class Decoder(nn.Module):
         embedded_sequence_trg = self.target_embedding(sequence_trg_flat, time_index_sequence, variable_index_sequence,sector_index_sequence)
 
         # Norm
-        normed_sequence_trg = self.norm1(embedded_sequence_trg)
+        normed_sequence_trg = self.norm1(embedded_sequence_trg.transpose(2,1))
 
         # Local Self Attetion
-        local_attention_trg = self.local_attention_layer(normed_sequence_trg)
+        local_attention_trg = self.local_attention_layer(normed_sequence_trg.transpose(2,1))
 
         # Norm
-        normed_local_attention_trg = self.norm2(embedded_sequence_trg + local_attention_trg)
+        normed_local_attention_trg = self.norm2(local_attention_trg.transpose(2,1)+embedded_sequence_trg.transpose(2,1))
 
         # Global Self Attention
-        global_attention_trg = self.global_attention_layer(normed_local_attention_trg)
+        global_attention_trg = self.global_attention_layer(normed_local_attention_trg.transpose(2,1))
 
         # Norm
-        normed_global_attention_trg = self.norm3(local_attention_trg + global_attention_trg)
+        normed_global_attention_trg = self.norm3(global_attention_trg.transpose(2,1)+local_attention_trg.transpose(2,1))
 
         # Cross Attention 1st Layer
-        cross_attention_1 = self.cross_attention_layer_1(normed_global_attention_trg, sequence_src_flat)
+        cross_attention_1 = self.cross_attention_layer_1(normed_global_attention_trg.transpose(2,1), sequence_src_flat)
 
         # Norm
-        normed_cross_attention = self.norm4(global_attention_trg + cross_attention_1)
+        normed_cross_attention = self.norm4(cross_attention_1.transpose(2,1)+global_attention_trg.transpose(2,1))
 
         # Cross Attention 2nd Layer
-        cross_attention_2 = self.cross_attention_layer_2(normed_cross_attention, sequence_src_flat)
+        cross_attention_2 = self.cross_attention_layer_2(normed_cross_attention.transpose(2,1), sequence_src_flat)
 
         # Norm
-        normed_cross_attention_2 = self.norm5(cross_attention_1 + cross_attention_2)
+        normed_cross_attention_2 = self.norm5(cross_attention_2.transpose(2,1)+cross_attention_1.transpose(2,1))
 
         # Linear Layer & ReLU
-        decoder_out = nn.ReLU()(self.W1(normed_cross_attention_2))
+        decoder_out = nn.ReLU()(self.W1(normed_cross_attention_2.transpose(2,1)))
 
         # Norm
-        normed_decoder_out = self.norm6(cross_attention_2 + decoder_out)
+        normed_decoder_out = self.norm6(decoder_out.transpose(2,1)+cross_attention_2.transpose(2,1))
 
         # Linear Layer
-        return self.output_layer(normed_decoder_out)
+        return self.output_layer(normed_decoder_out.transpose(2,1))

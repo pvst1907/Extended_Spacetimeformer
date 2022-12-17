@@ -2,21 +2,6 @@ import torch
 import torch.nn as nn
 
 
-class SafeSoftmax(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, X):
-        X_denom = torch.sum(torch.exp(X), 2) + 1e-8
-        if torch.isnan(X_denom).any():
-            print('B')
-            assert False
-        if torch.isnan(torch.divide(torch.exp(X), torch.unsqueeze(X_denom, dim=2))).any():
-            print(torch.min(X_denom))
-            assert False
-        return torch.divide(torch.exp(X + 1e-8), torch.unsqueeze(X_denom, dim=2))
-
-
 class LocalSelfAttention(nn.Module):
     def __init__(self, input_size, seq_length, embedding_size, qkv_size, masked=False):
 
@@ -95,7 +80,7 @@ class AttentionHead(nn.Module):
         # Dimensions W_V: (N_w*M) x (N_w*s_qkv)
         self.WV = nn.Linear(seq_length * self.emb_size, seq_length * self.qkv_size)
 
-        self.softmax = SafeSoftmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, sent_embed_slice):  # Dimension sent_embed_slice: (N_w x M)
         # Dimensions Q: (N_w x s_qkv)
@@ -168,7 +153,7 @@ class CrossAttentionHead(nn.Module):
         # Dimensions W_V: (N_w*M) x (N_w*s_qkv)
         self.WV = nn.Linear(src_seq_length * self.emb_size, src_seq_length * self.qkv_size)
 
-        self.softmax = SafeSoftmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, basic_decoder_slice, final_encoder_slice):  #Dimension basic_decoder_slice (source): (N_w x M), Dimension final_encoder_slice (target): (N_w x M)
         # Dimensions Q: (N_w x s_qkv)

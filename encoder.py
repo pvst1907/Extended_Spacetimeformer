@@ -19,19 +19,19 @@ class Encoder(nn.Module):
 
         self.context_embedding = EmbeddingGenerator(self.embedding_size_time, self.embedding_size_variable,self.embedding_size_sector, self.input_size, self.src_seq_length)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm1 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
+        self.norm1 = nn.BatchNorm1d(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.local_attention_layer = LocalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm2 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
+        self.norm2 = nn.BatchNorm1d(self.embedding_size)
         # Self-Attention Layer Local (in: (N_w x M) out: (N_w x M))
         self.global_attention_layer = GlobalSelfAttention(self.input_size, self.src_seq_length, self.embedding_size, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm3 = nn.LayerNorm([self.src_seq_length, self.embedding_size])
+        self.norm3 = nn.BatchNorm1d(self.embedding_size)
         # FFN  (in: (N_w x M) out: (N_w x M))
         self.W1 = nn.Linear(self.s_qkv, self.s_qkv)
         # Layer Norm  (in: (N_w x M) out: (N_w x M))
-        self.norm4 = nn.LayerNorm((self.src_seq_length, self.embedding_size))
+        self.norm4 = nn.BatchNorm1d(self.embedding_size)
 
     def forward(self, sequence):
 
@@ -46,24 +46,24 @@ class Encoder(nn.Module):
         embedded_sequence = self.context_embedding(sequence_flat, time_index_sequence, variable_index_sequence, sector_index_sequence)
 
         # Norm
-        normed_sequence = self.norm1(embedded_sequence)
+        normed_sequence = self.norm1(embedded_sequence.transpose(2,1))
 
         # Local Self Attention
-        local_attention = self.local_attention_layer(normed_sequence)
+        local_attention = self.local_attention_layer(normed_sequence.transpose(2,1))
 
         # Norm
-        normed_local_attention = self.norm2(embedded_sequence + local_attention)
+        normed_local_attention = self.norm2(local_attention.transpose(2,1)+embedded_sequence.transpose(2,1))
 
         # Global Self Attention NaN
-        global_attention = self.global_attention_layer(normed_local_attention)
+        global_attention = self.global_attention_layer(normed_local_attention.transpose(2,1))
 
         # Norm
-        normed_global_attention = self.norm3(local_attention + global_attention)
+        normed_global_attention = self.norm3(global_attention.transpose(2,1)+local_attention.transpose(2,1))
 
         # Linear Layer & ReLU
-        encoder_out = nn.ReLU()(self.W1(normed_global_attention))
+        encoder_out = nn.ReLU()(self.W1(normed_global_attention.transpose(2,1)))
 
         # Norm
-        normed_encoder_out = self.norm4(global_attention + encoder_out)
+        normed_encoder_out = self.norm4(encoder_out.transpose(2,1)+global_attention.transpose(2,1))
 
-        return normed_encoder_out
+        return normed_encoder_out.transpose(2,1)

@@ -14,7 +14,7 @@ def train_epoch(xformer,
     tracker = Accumulator(2)
     for src, trg, trg_y in train_iter:
         trg_y_hat = xformer(src, trg)
-        l = loss(trg_y, trg_y_hat)
+        l = loss(trg_y.transpose(2,1), trg_y_hat)
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
         l.mean().backward()
@@ -40,7 +40,7 @@ def train_torch(xformer,
                 plot=False):
     min_loss = np.nan
     epochs_no_improve = 0
-    torch.autograd.set_detect_anomaly(True)
+    #torch.autograd.set_detect_anomaly(True)
     if plot:
         animator = Animator(xlabel='epoch', xlim=[1, epochs], legend=['training loss', 'evaluation_loss'])
     for epoch in range(epochs):
