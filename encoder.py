@@ -67,7 +67,7 @@ class Encoder(nn.Module):
         global_attention = self.global_attention_layer(normed_sector_attention.transpose(2,1))
 
         # Norm
-        normed_global_attention = self.norm4(global_attention.transpose(2, 1) + structural_attention.transpose(2, 1))
+        normed_global_attention = self.norm4(global_attention.transpose(2,1) + structural_attention.transpose(2,1))
 
         # Linear Layer & ReLU
         encoder_out = nn.ReLU()(self.W1(normed_global_attention.transpose(2,1)))
