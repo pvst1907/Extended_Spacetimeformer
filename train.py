@@ -1,51 +1,28 @@
 import copy
 import numpy as np
 import torch
+import torch.nn as nn
 from utils import Accumulator, Animator
-
-
-class ScheduledOptim:
-    def __init__(self, optimizer, lr_mul, d_model, n_warmup_steps):
-        self._optimizer = optimizer
-        self.lr_mul = lr_mul
-        self.d_model = d_model
-        self.n_warmup_steps = n_warmup_steps
-        self.n_steps = 0
-
-    def step_and_update_lr(self):
-        self._update_learning_rate()
-        self._optimizer.step()
-
-    def zero_grad(self):
-        self._optimizer.zero_grad()
-
-    def _get_lr_scale(self):
-        d_model = self.d_model
-        n_steps, n_warmup_steps = self.n_steps, self.n_warmup_steps
-        return (d_model ** -0.5) * min(n_steps ** (-0.5), n_steps * n_warmup_steps ** (-1.5))
-
-    def _update_learning_rate(self):
-        self.n_steps += 1
-        lr = self.lr_mul * self._get_lr_scale()
-        for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
 
 
 def train_epoch(xformer,
                 train_iter,
                 loss,
-                master_encoder_optimizer,
-                master_decoder_optimizer):
+                encoder_optimizer,
+                decoder_optimizer):
     xformer.train()
     tracker = Accumulator(2)
     for src, trg, trg_y in train_iter:
         trg_y_hat = xformer(src, trg)
-        l = loss(trg_y, trg_y_hat)
-        master_encoder_optimizer.zero_grad()
-        master_decoder_optimizer.zero_grad()
+        l = loss(trg_y.transpose(2,1), trg_y_hat)
+        encoder_optimizer.zero_grad()
+        decoder_optimizer.zero_grad()
         l.mean().backward()
-        master_encoder_optimizer.step_and_update_lr()
-        master_decoder_optimizer.step_and_update_lr()
+        #nn.utils.clip_grad_norm_(xformer.parameters(), 3)
+        nn.utils.clip_grad_value_(xformer.parameters(), 3)
+        encoder_optimizer.step()
+        decoder_optimizer.step()
+
     tracker.add(float(l.sum()), trg_y.numel())
     return tracker[0] / tracker[1]
 
@@ -56,17 +33,18 @@ def train_torch(xformer,
                 loss,
                 metric,
                 epochs,
-                master_encoder_optimizer,
-                master_decoder_optimizer,
+                encoder_optimizer,
+                decoder_optimizer,
                 patience=100,
                 verbose=False,
                 plot=False):
     min_loss = np.nan
     epochs_no_improve = 0
+    #torch.autograd.set_detect_anomaly(True)
     if plot:
         animator = Animator(xlabel='epoch', xlim=[1, epochs], legend=['training loss', 'evaluation_loss'])
     for epoch in range(epochs):
-        train_tracker = train_epoch(xformer, train_iter, loss, master_encoder_optimizer, master_decoder_optimizer)
+        train_tracker = train_epoch(xformer, train_iter, loss, encoder_optimizer, decoder_optimizer)
         eval_tracker = evaluate_model(xformer, test_iter, metric)
         epochs_no_improve += 1
         if np.isnan(min_loss) or train_tracker < min_loss:
