@@ -2,34 +2,43 @@ import torch.nn as nn
 import torch
 import numpy as np
 
-'''Needs to be updated'''
-'''Problem is that when target source legnth is greater than source length, the index is out of bounds'''
 class Performer(nn.Module):
-    def __init__(self):
-        super().__init__()
+    def _init_(self):
+        super()._init_()
 
-    def forward(self, Q, K, V, sent_embed_slice, qkv_size, masked=False):
+    # L >= M case - after i reaches M, we only use M keys, i.e. the maximum number of keys available
+    def case1(self, Q, K, V, sent_embed_slice, qkv_size, masked = False):
+
         self.qkv_size = qkv_size
         self.masked = masked
         L_ = Q.shape[1]
         M_ = V.shape[1]
         Performer = torch.zeros(sent_embed_slice.shape[0], *(L_, self.qkv_size))
+
+        M = torch.matmul(self.phi(K[:, 0, :]).view(sent_embed_slice.shape[0], self.qkv_size, 1),
+                         V[:, 0, :].view(sent_embed_slice.shape[0], 1, self.qkv_size))
+        N = self.phi(K[:, 0, :])
+
         if self.masked:
             for i in range(L_):
-                if i > 0:
+                if i < M_:
                     M = M + torch.matmul(self.phi(K[:, i, :]).view(sent_embed_slice.shape[0], self.qkv_size, 1),
                                          V[:, i, :].view(sent_embed_slice.shape[0], 1, self.qkv_size))
                     N = N + self.phi(K[:, i, :])
-                else:
-                    M = torch.matmul(self.phi(K[:, i, :]).view(sent_embed_slice.shape[0], self.qkv_size, 1),
-                                     V[:, i, :].view(sent_embed_slice.shape[0], 1, self.qkv_size))
-                    N = self.phi(K[:, i, :])
-                new_x = torch.matmul(self.phi(Q[:, i, :]), M)
-                r = torch.matmul(self.phi(Q[:, i, :]), N.view(sent_embed_slice.shape[0], self.qkv_size, 1))
-                sign = torch.tensor(np.sign(r.detach().numpy()))
-                Performer[:, i, :] = torch.div(new_x, (r + sign * 1e-6)).view(sent_embed_slice.shape[0], self.qkv_size)
-        else:
 
+                    new_x = torch.matmul(self.phi(Q[:, i, :]), M)
+                    r = torch.matmul(self.phi(Q[:, i, :]), N.view(sent_embed_slice.shape[0], self.qkv_size, 1))
+                    sign = torch.tensor(np.sign(r.detach().numpy()))
+                    Performer[:, i, :] = torch.div(new_x, (r + sign * 1e-6)).view(sent_embed_slice.shape[0],
+                                                                                  self.qkv_size)
+                else:
+                    new_x = torch.matmul(self.phi(Q[:, i, :]), M)
+                    r = torch.matmul(self.phi(Q[:, i, :]), N.view(sent_embed_slice.shape[0], self.qkv_size, 1))
+                    sign = torch.tensor(np.sign(r.detach().numpy()))
+                    Performer[:, i, :] = torch.div(new_x, (r + sign * 1e-6)).view(sent_embed_slice.shape[0],
+                                                                                  self.qkv_size)
+
+        else:
             sum = torch.zeros(sent_embed_slice.shape[0], self.qkv_size, self.qkv_size)
             norm_sum = torch.zeros(sent_embed_slice.shape[0], self.qkv_size, self.qkv_size)
             for j in range(M_):
@@ -42,6 +51,38 @@ class Performer(nn.Module):
                 Performer[:, i, :] = torch.div(new_x, r).view(sent_embed_slice.shape[0], self.qkv_size)
 
         return Performer
+
+    # L < M case
+    def case2(self, Q, K, V, sent_embed_slice, qkv_size, masked = False):
+        self.qkv_size = qkv_size
+        self.masked = masked
+        L_ = Q.shape[1]
+        M_ = V.shape[1]
+        Performer = torch.zeros(sent_embed_slice.shape[0], *(L_, self.qkv_size))
+        n = M_ // L_
+        rem = M_ % L_
+        for i in range(n):
+            K_ = K[:, i*L_:(i+1)*L_, :]
+            V_ = V[:, i*L_:(i+1)*L_, :]
+            Performer += self.case1(Q, K_, V_, sent_embed_slice, qkv_size, masked = self.masked)
+
+        if rem > 0:
+            K_ = K[:, (M_ - rem): rem]
+            V_ = V[:, (M_ - rem): rem]
+            Performer += self.case1(Q, K_, V_, sent_embed_slice, qkv_size, masked = self.masked)
+
+        return Performer
+
+    def forward(self, Q, K, V, sent_embed_slice, qkv_size, masked=False):
+        self.qkv_size = qkv_size
+        self.masked = masked
+        L_ = Q.shape[1]
+        M_ = V.shape[1]
+
+        if L_ >= M_:
+            return self.case1(Q, K, V, sent_embed_slice, self.qkv_size, self.masked)
+        else:
+            return self.case2(Q, K, V, sent_embed_slice, self.qkv_size, self.masked)
 
     def phi(self, x):
         x = x.view(x.shape[0], x.shape[1], 1)

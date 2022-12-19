@@ -6,7 +6,8 @@ from encoder import Encoder
 from decoder import Decoder
 from train import train_torch
 from sklearn import preprocessing
-
+import torch
+torch.manual_seed(0)
 
 class SpaceTimeFormer(nn.Module):
     def __init__(self,
